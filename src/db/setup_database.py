@@ -24,7 +24,7 @@ def build_vector_database(
         inplace=True,
     )
 
-    dataset = dataset.head(300)
+    dataset = dataset.head(2000)
 
     print(f"Loading ai slop: {transformer_model}...")
     model = SentenceTransformer(transformer_model)

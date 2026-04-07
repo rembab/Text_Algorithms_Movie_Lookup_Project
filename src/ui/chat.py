@@ -38,11 +38,17 @@ class ChatScreen:
             on_click=self.on_click_submit,
         )
 
+        self.results_text = ft.Text(
+            value="",
+            text_align=ft.TextAlign.START,
+        )
+
         self.main_layout = ft.Column(
             controls=[
                 self.header_text,
                 self.input_field,
                 self.submit_button,
+                self.results_text,
             ],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -59,3 +65,6 @@ class ChatScreen:
         # clear input field
         self.input_field.value = ""
         self.page.update()
+
+    def set_results_text(self, text):
+        self.results_text.value = text
