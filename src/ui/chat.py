@@ -27,20 +27,25 @@ class ChatScreen:
         self.header_text = ft.Text(
             value="I remember a movie where...",
             text_align=ft.TextAlign.CENTER,
+            font_family="Consolas",
         )
 
         self.input_field = ft.TextField(width=300, multiline=True, min_lines=10)
 
         self.submit_button = ft.Button(
-            content="imabutton",
+            content="Submit query",
             bgcolor="#FFFFFF",
             color="#000000",
             on_click=self.on_click_submit,
+            style=ft.ButtonStyle(
+                text_style=ft.TextStyle(font_family="Consolas"),
+            ),
         )
 
         self.results_text = ft.Text(
             value="",
             text_align=ft.TextAlign.START,
+            font_family="Consolas",
         )
 
         self.main_layout = ft.Column(
