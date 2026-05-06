@@ -1,17 +1,17 @@
 import lancedb
 from sentence_transformers import SentenceTransformer
+import pandas as pd
 
 
 class Database:
     def __init__(self, db_path: str = "./data/database"):
         self.db = lancedb.connect(db_path)
         self.plot_table = self.db.open_table("plots")
-
         self.model = SentenceTransformer("BAAI/bge-small-en-v1.5")
 
     def search_movies(self, user_query: str, num_results: int = 5):
         query_vector = self.model.encode(user_query)
 
-        results_df = self.plot_table.search(query_vector).limit(num_results)
+        results_df = self.plot_table.search(query_vector).limit(num_results).to_pandas()
 
-        return results_df
+        return results_df[["Title", "Release Year", "Genre", "Plot", "_distance"]]

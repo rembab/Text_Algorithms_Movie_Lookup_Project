@@ -7,18 +7,11 @@ def main(page: ft.Page):
     db = Database()
 
     def print_best_matches(text):
-        results = db.search_movies(text).to_pandas()[["Title", "_distance"]]
-        results["Similarity"] = 1 - results["_distance"]
+        results_df = db.search_movies(text)
 
-        title_width = results["Title"].str.len().max() + 2
-        formatted_lines = [
-            f"{row['Title']:<{title_width}}{row['Similarity']:>8.4f}"
-            for _, row in results.iterrows()
-        ]
+        results_df["Similarity"] = 1 - results_df["_distance"]
 
-        chat.set_results_text(
-            "My best guesses:\n" + f"{"Title":<{title_width-10}}{"Similarity":>18}\n" + "\n".join(formatted_lines)
-        )
+        chat.update_results(results_df)
 
     chat = ChatScreen(page, print_best_matches)
 
