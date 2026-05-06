@@ -80,7 +80,6 @@ def build_vector_database(
         print(f"Loading csv {path}...")
         df = pd.read_csv(path)
 
-        # Build rename map safely
         rename_map = {}
         if config.get("title_col"):
             rename_map[config["title_col"]] = "Title"
@@ -113,11 +112,9 @@ def build_vector_database(
 
     print("Merging duplicates based on semantic distance...")
 
-    # Pre-calculate groups to get the total length for the progress bar
     grouped = dataset.groupby(["Title", "Release Year"])
     total_groups = grouped.ngroups
 
-    # We use a list to store the counter so it can be mutated inside the inner function
     progress_counter = [0]
 
     def merge_group(group):
@@ -131,11 +128,8 @@ def build_vector_database(
             }
         )
 
-        # --- Native Progress Bar Logic ---
         progress_counter[0] += 1
 
-        # pandas sometimes evaluates the first group twice to check return types.
-        # min() prevents the progress bar from glitching past 100% if this happens.
         current = min(progress_counter[0], total_groups)
 
         percent = (current / total_groups) * 100
@@ -143,18 +137,16 @@ def build_vector_database(
         filled_length = int(bar_length * current // total_groups)
         bar = "█" * filled_length + "-" * (bar_length - filled_length)
 
-        # \r brings the cursor back to the start of the line. flush=True forces the terminal to update immediately.
         print(
             f"\rProgress: |{bar}| {percent:.1f}% ({current}/{total_groups})",
             end="",
             flush=True,
         )
-        # ---------------------------------
 
         return result
 
     grouped_dataset = grouped.apply(merge_group).reset_index()
-    print()  # Add a final newline so the next print statement doesn't overwrite the completed bar
+    print()
 
     print("Combining fields for rich vectorization...")
     grouped_dataset["combined_text"] = (

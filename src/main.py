@@ -9,8 +9,6 @@ def main(page: ft.Page):
     def print_best_matches(text):
         results_df = db.search_movies(text)
 
-        results_df["Similarity"] = 1 - results_df["_distance"]
-
         chat.update_results(results_df)
 
     chat = ChatScreen(page, print_best_matches)

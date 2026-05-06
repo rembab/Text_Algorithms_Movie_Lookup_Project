@@ -23,6 +23,37 @@ class ChatScreen:
         self.page.add(self.main_layout)
 
     def init_components(self):
+        # --- Pre-define the Dialog (Bulletproof Approach) ---
+        self.dialog_title = ft.Text(
+            font_family="Consolas", weight=ft.FontWeight.BOLD, color="#FFFFFF"
+        )
+        self.dialog_content = ft.Text(
+            font_family="Consolas", size=16, color="#FFFFFF", selectable=True
+        )
+
+        self.plot_dialog = ft.AlertDialog(
+            bgcolor="#4c5060",
+            title=self.dialog_title,
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[self.dialog_content],
+                    scroll=ft.ScrollMode.AUTO,
+                    tight=True,
+                ),
+                height=400,
+                width=600,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Close",
+                    on_click=lambda _: self.close_dialog(),
+                    style=ft.ButtonStyle(color="#a8ffb2"),
+                )
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.overlay.append(self.plot_dialog)
+
         self.header_text = ft.Text(
             value="I remember a movie where...",
             text_align=ft.TextAlign.CENTER,
@@ -39,11 +70,6 @@ class ChatScreen:
             bgcolor="#FFFFFF",
             color="#000000",
             on_click=self.on_click_submit,
-            style=ft.ButtonStyle(
-                text_style=ft.TextStyle(
-                    font_family="Consolas", weight=ft.FontWeight.BOLD
-                ),
-            ),
         )
 
         self.results_table = ft.DataTable(
@@ -62,17 +88,9 @@ class ChatScreen:
                     numeric=True,
                 ),
             ],
-            rows=[],
             bgcolor="#4c5060",
             border=ft.border.all(1, "#3b3e4a"),
             border_radius=10,
-            column_spacing=40,
-        )
-
-        self.table_container = ft.Column(
-            controls=[self.results_table],
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
         )
 
         self.main_layout = ft.Column(
@@ -81,48 +99,52 @@ class ChatScreen:
                 self.input_field,
                 self.submit_button,
                 ft.Divider(height=20, color="transparent"),
-                self.table_container,
+                ft.Column([self.results_table], scroll=ft.ScrollMode.AUTO, expand=True),
             ],
-            alignment=ft.MainAxisAlignment.START,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             expand=True,
         )
 
-    def on_click_submit(self, e):
-        user_input = self.input_field.value
-        if not user_input.strip():
-            return
-
-        self.submit_fun(user_input)
-
-        self.input_field.value = ""
+    def close_dialog(self):
+        self.plot_dialog.open = False
         self.page.update()
+
+    def show_movie_details(self, e, title, year, plot):
+        e.control.selected = False
+
+        self.dialog_title.value = f"{title} ({year})"
+        self.dialog_content.value = plot if plot else "No plot available."
+
+        self.plot_dialog.open = True
+        self.page.update()
+
+    def on_click_submit(self, e):
+        if self.input_field.value.strip():
+            self.submit_fun(self.input_field.value)
 
     def update_results(self, results_df: pd.DataFrame):
         self.results_table.rows.clear()
 
-        for index, row in results_df.iterrows():
-
+        for _, row in results_df.iterrows():
             title = str(row.get("Title", "Unknown"))
             year = str(row.get("Release Year", "Unknown"))
+            plot = str(row.get("Plot", ""))
+            sim = row.get("Similarity", 0)
+            sim_str = f"{sim:.4f}" if isinstance(sim, (int, float)) else str(sim)
 
-            similarity_val = row.get("Similarity", 0)
-            similarity_str = f"{similarity_val:.4f}"
-
-            table_row = ft.DataRow(
-                cells=[
-                    ft.DataCell(ft.Text(title, font_family="Consolas", size=16)),
-                    ft.DataCell(ft.Text(year, font_family="Consolas", size=16)),
-                    ft.DataCell(
-                        ft.Text(
-                            similarity_str,
-                            font_family="Consolas",
-                            size=16,
-                            color="#a8ffb2",
-                        )
+            self.results_table.rows.append(
+                ft.DataRow(
+                    # Passing 'e' allows us to unselect the row inside the handler
+                    on_select_change=lambda e, t=title, y=year, p=plot: self.show_movie_details(
+                        e, t, y, p
                     ),
-                ]
+                    cells=[
+                        ft.DataCell(ft.Text(title, font_family="Consolas")),
+                        ft.DataCell(ft.Text(year, font_family="Consolas")),
+                        ft.DataCell(
+                            ft.Text(sim_str, font_family="Consolas", color="#a8ffb2")
+                        ),
+                    ],
+                )
             )
-            self.results_table.rows.append(table_row)
-
         self.page.update()
