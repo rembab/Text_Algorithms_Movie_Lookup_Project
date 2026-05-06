@@ -23,7 +23,12 @@ class Database:
     def search_movies(self, user_query: str, num_results: int = 5):
         query_vector = self.model.encode(user_query)
 
-        raw_results_df = self.plot_table.search(query_vector).limit(50).to_pandas()
+        raw_results_df = (
+            self.plot_table.search(query_vector)
+            .distance_type("cosine")
+            .limit(50)
+            .to_pandas()
+        )
 
         if raw_results_df.empty:
             return pd.DataFrame(

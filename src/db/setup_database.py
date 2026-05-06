@@ -4,6 +4,7 @@ import numpy as np
 from numpy.linalg import norm
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict
+import re
 
 
 def cosine_similarity(a, b):
@@ -13,26 +14,26 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (norm(a) * norm(b))
 
 
-def combine_genres(genres: List[str]) -> str:
-    """Merges multiple genre strings, removing duplicates."""
-    import re
+GENRE_SPLIT_RE = re.compile(r"[,|\[\]/]")
 
-    unique_genres = set()
-    for g in genres:
-        if pd.isna(g):
-            continue
-        parts = re.split(r"[,|\[\]/]", str(g))
-        for p in parts:
-            cleaned = p.strip().title()
-            if cleaned and cleaned != "Unknown":
-                unique_genres.add(cleaned)
-    return ", ".join(sorted(unique_genres)) if unique_genres else "Unknown"
+
+def combine_genres(genres: List[str]) -> str:
+    cleaned = {
+        part.strip().title()
+        for g in genres
+        if pd.notna(g)
+        for part in GENRE_SPLIT_RE.split(str(g))
+        if part.strip() and part.strip().lower() != "unknown"
+    }
+
+    return ", ".join(sorted(cleaned)) if cleaned else "Unknown"
 
 
 def smart_combine_plots(
-    plots: List[str], model: SentenceTransformer, threshold: float = 0.85
+    plots: List[str],
+    model: SentenceTransformer,
+    threshold: float = 0.85,
 ) -> str:
-    """Combines plots based on semantic similarity to avoid redundant slop."""
     valid_plots = [str(p).strip() for p in plots if pd.notna(p) and str(p).strip()]
 
     if not valid_plots:
@@ -42,24 +43,23 @@ def smart_combine_plots(
 
     valid_plots = sorted(valid_plots, key=len, reverse=True)
 
-    final_plots = [valid_plots[0]]
-    final_embeddings = [model.encode(valid_plots[0])]
+    embeddings = model.encode(valid_plots, batch_size=32, normalize_embeddings=True)
+    embeddings = np.array(embeddings)
 
-    for p in valid_plots[1:]:
-        p_emb = model.encode(p)
+    selected_indices = []
+    used = np.zeros(len(valid_plots), dtype=bool)
 
-        is_redundant = False
-        for kept_emb in final_embeddings:
-            sim = cosine_similarity(p_emb, kept_emb)
-            if sim >= threshold:
-                is_redundant = True
-                break
+    for i in range(len(valid_plots)):
+        if used[i]:
+            continue
 
-        if not is_redundant:
-            final_plots.append(p)
-            final_embeddings.append(p_emb)
+        selected_indices.append(i)
 
-    return "\n\n".join(final_plots)
+        sims = embeddings @ embeddings[i]
+
+        used |= sims >= threshold
+
+    return "\n\n".join(valid_plots[i] for i in selected_indices)
 
 
 def build_vector_database(
