@@ -1,7 +1,7 @@
 from typing import Callable
 import flet as ft
 import pandas as pd
-
+import asyncio
 
 class ChatScreen:
     def __init__(self, page: ft.Page, submit_fun: Callable):
@@ -118,9 +118,20 @@ class ChatScreen:
         self.plot_dialog.open = True
         self.page.update()
 
-    def on_click_submit(self, e):
-        if self.input_field.value.strip():
-            self.submit_fun(self.input_field.value)
+    async def on_click_submit(self, e):
+        query = self.input_field.value.strip()
+        if not query:
+            return
+        
+        self.submit_button.content = ft.Row([
+            ft.ProgressRing(width=16, height=16),
+            ft.Text("Searching...")
+        ], tight=True)
+        self.submit_button.disabled = True
+        self.page.update()
+
+        # Moves the query to another thread so that the UI updates
+        await asyncio.to_thread(self.submit_fun, query)
 
     def update_results(self, results_df: pd.DataFrame):
         self.results_table.rows.clear()
@@ -147,4 +158,6 @@ class ChatScreen:
                     ],
                 )
             )
+
+        self.submit_button.content = ft.Text("Submit query")
         self.page.update()
