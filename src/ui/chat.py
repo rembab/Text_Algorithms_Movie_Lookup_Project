@@ -66,31 +66,21 @@ class ChatScreen:
         )
 
         self.submit_button = ft.Button(
-            content=ft.Text("Submit query"),
+            content=ft.Text("Submit query", text_align=ft.TextAlign.CENTER),
             bgcolor="#FFFFFF",
             color="#000000",
             on_click=self.on_click_submit,
+            width=170,
         )
 
-        self.results_table = ft.DataTable(
-            columns=[
-                ft.DataColumn(
-                    ft.Text("Title", font_family="Consolas", weight=ft.FontWeight.BOLD)
-                ),
-                ft.DataColumn(
-                    ft.Text("Year", font_family="Consolas", weight=ft.FontWeight.BOLD),
-                    numeric=True,
-                ),
-                ft.DataColumn(
-                    ft.Text(
-                        "Similarity", font_family="Consolas", weight=ft.FontWeight.BOLD
-                    ),
-                    numeric=True,
-                ),
-            ],
-            bgcolor="#4c5060",
-            border=ft.border.all(1, "#3b3e4a"),
-            border_radius=10,
+        self.results_grid = ft.GridView(
+            expand=True,
+            runs_count=3,
+            max_extent=280,
+            child_aspect_ratio=1.1,
+            spacing=14,
+            run_spacing=14,
+            padding=ft.padding.all(8),
         )
 
         self.main_layout = ft.Column(
@@ -99,7 +89,7 @@ class ChatScreen:
                 self.input_field,
                 self.submit_button,
                 ft.Divider(height=20, color="transparent"),
-                ft.Column([self.results_table], scroll=ft.ScrollMode.AUTO, expand=True),
+                self.results_grid,
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             expand=True,
@@ -110,8 +100,6 @@ class ChatScreen:
         self.page.update()
 
     def show_movie_details(self, e, title, year, plot):
-        e.control.selected = False
-
         self.dialog_title.value = f"{title} ({year})"
         self.dialog_content.value = plot if plot else "No plot available."
 
@@ -126,38 +114,143 @@ class ChatScreen:
         self.submit_button.content = ft.Row([
             ft.ProgressRing(width=16, height=16),
             ft.Text("Searching...")
-        ], tight=True)
+        ], tight=True, alignment=ft.MainAxisAlignment.CENTER)
         self.submit_button.disabled = True
         self.page.update()
 
         # Moves the query to another thread so that the UI updates
         await asyncio.to_thread(self.submit_fun, query)
 
+    def _sim_color(self, sim: float) -> str:
+        # Interpolates between red, yellow and green
+        t = max(0.0, min(1.0, float(sim)))
+        if t < 0.5:
+            r, g = 220, int(220 * (t / 0.5))
+        else:
+            r, g = int(220 * (1 - (t - 0.5) / 0.5)), 200
+        return f"#{r:02x}{g:02x}40"
+
+    def _build_card(self, title: str, year: str, plot: str, sim: float) -> ft.Container:
+        sim_pct = sim * 100
+        bar_color = self._sim_color(sim)
+        plot_preview = (plot[:160] + "…") if len(plot) > 160 else plot
+
+        # sim_bar = ft.Container(
+        #     width=10,
+        #     border_radius=ft.border_radius.all(4),
+        #     bgcolor="#3b3e4a",
+        #     content=ft.Column(
+        #         controls=[
+        #             ft.Container(expand=True),          # empty top spacer
+        #             ft.Container(
+        #                 bgcolor=bar_color,
+        #                 border_radius=ft.border_radius.all(4),
+        #                 height=None,
+        #                 expand=int(round(sim_pct)),     # proportional fill
+        #             ),
+        #         ],
+        #         spacing=0,
+        #         expand=True,
+        #     ),
+        #     expand=False,
+        # )
+        sim_bar = ft.Container(
+            width=10,
+            border_radius=ft.border_radius.all(4),
+            bgcolor="#3b3e4a",
+            content=ft.Column(
+                controls=[
+                    ft.Container(expand=int(100 - round(sim_pct))),
+                    ft.Container(
+                        bgcolor=bar_color,
+                        border_radius=ft.border_radius.all(4),
+                        expand=int(round(sim_pct)) or 1,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=False,
+        )
+
+        card_body = ft.Column(
+            controls=[
+                ft.Text(
+                    f"{title} ({year})",
+                    font_family="Consolas",
+                    weight=ft.FontWeight.BOLD,
+                    size=13,
+                    color="#FFFFFF",
+                    max_lines=2,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                ft.Row(
+                    controls=[
+                        ft.Container(
+                            width=8,
+                            height=8,
+                            border_radius=ft.border_radius.all(4),
+                            bgcolor=bar_color,
+                        ),
+                        ft.Text(
+                            f"Similarity: {sim_pct:.1f}%",
+                            font_family="Consolas",
+                            size=12,
+                            color=bar_color if bar_color else "#a8ffb2",
+                        ),
+                    ],
+                    spacing=6,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                ft.Divider(height=6, color="#3b3e4a"),
+                ft.Text(
+                    plot_preview,
+                    font_family="Consolas",
+                    size=11,
+                    color="#c8cad4",
+                    max_lines=5,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                    expand=True,
+                ),
+                ft.Text(
+                    "Show full summary →",
+                    font_family="Consolas",
+                    size=11,
+                    color="#a8ffb2",
+                ),
+            ],
+            spacing=6,
+            expand=True,
+        )
+
+        return ft.Container(
+            content=ft.Row(
+                controls=[card_body, sim_bar],
+                spacing=8,
+                expand=True,
+                vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            ),
+            bgcolor="#4c5060",
+            border=ft.border.all(1, "#3b3e4a"),
+            border_radius=10,
+            padding=ft.padding.all(12),
+            expand=True,
+            on_click=lambda e, t=title, y=year, p=plot: self.show_movie_details(e, t, y, p),
+            ink=True,
+        )
+
     def update_results(self, results_df: pd.DataFrame):
-        self.results_table.rows.clear()
+        self.results_grid.controls.clear()
 
         for _, row in results_df.iterrows():
             title = str(row.get("Title", "Unknown"))
             year = str(row.get("Release Year", "Unknown"))
             plot = str(row.get("Plot", ""))
             sim = row.get("Similarity", 0)
-            sim_str = f"{sim:.4f}" if isinstance(sim, (int, float)) else str(sim)
+            sim_val = float(sim.strip('%')) / 100 if isinstance(sim, str) else 0.0
 
-            self.results_table.rows.append(
-                ft.DataRow(
-                    # Passing 'e' allows us to unselect the row inside the handler
-                    on_select_change=lambda e, t=title, y=year, p=plot: self.show_movie_details(
-                        e, t, y, p
-                    ),
-                    cells=[
-                        ft.DataCell(ft.Text(title, font_family="Consolas")),
-                        ft.DataCell(ft.Text(year, font_family="Consolas")),
-                        ft.DataCell(
-                            ft.Text(sim_str, font_family="Consolas", color="#a8ffb2")
-                        ),
-                    ],
-                )
-            )
+            self.results_grid.controls.append(self._build_card(title, year, plot, sim_val))
 
-        self.submit_button.content = ft.Text("Submit query")
+        self.submit_button.content = ft.Text("Submit query", text_align=ft.TextAlign.CENTER)
+        self.submit_button.disabled = False
         self.page.update()
