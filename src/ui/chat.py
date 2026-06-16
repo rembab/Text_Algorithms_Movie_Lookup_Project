@@ -12,6 +12,8 @@ class ChatScreen:
     def setup_page(self):
         self.page.window.width = 800
         self.page.window.height = 800
+        self.page.window.min_width = 800
+        self.page.window.min_height = 800
         self.page.bgcolor = "#5b5f72"
         self.page.theme = ft.Theme(
             text_theme=ft.TextTheme(
@@ -23,6 +25,12 @@ class ChatScreen:
         self.page.add(self.main_layout)
 
     def init_components(self):
+        # --- Pagination state ---
+        self._all_cards: list = []
+        self._current_page: int = 0
+        self._total_pages: int = 4
+        self._cards_per_page: int = 6
+
         # --- Pre-define the Dialog (Bulletproof Approach) ---
         self.dialog_title = ft.Text(
             font_family="Consolas", weight=ft.FontWeight.BOLD, color="#FFFFFF"
@@ -73,14 +81,32 @@ class ChatScreen:
             width=170,
         )
 
-        self.results_grid = ft.GridView(
-            expand=True,
-            runs_count=3,
-            max_extent=280,
-            child_aspect_ratio=1.1,
+        self.results_grid = ft.Column(
+            controls=[],
             spacing=14,
-            run_spacing=14,
-            padding=ft.padding.all(8),
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        self._prev_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_LEFT,
+            icon_color="#FFFFFF",
+            icon_size=28,
+            disabled=True,
+            on_click=self._on_prev_page,
+        )
+        self._next_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_RIGHT,
+            icon_color="#FFFFFF",
+            icon_size=28,
+            disabled=True,
+            on_click=self._on_next_page,
+        )
+        self._page_dots = ft.Row(controls=[], spacing=8)
+        self.pagination_bar = ft.Row(
+            controls=[self._prev_btn, self._page_dots, self._next_btn],
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            visible=False,
         )
 
         self.main_layout = ft.Column(
@@ -90,6 +116,8 @@ class ChatScreen:
                 self.submit_button,
                 ft.Divider(height=20, color="transparent"),
                 self.results_grid,
+                ft.Divider(height=10, color="transparent"),
+                self.pagination_bar,
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             expand=True,
@@ -135,25 +163,6 @@ class ChatScreen:
         bar_color = self._sim_color(sim)
         plot_preview = (plot[:160] + "…") if len(plot) > 160 else plot
 
-        # sim_bar = ft.Container(
-        #     width=10,
-        #     border_radius=ft.border_radius.all(4),
-        #     bgcolor="#3b3e4a",
-        #     content=ft.Column(
-        #         controls=[
-        #             ft.Container(expand=True),          # empty top spacer
-        #             ft.Container(
-        #                 bgcolor=bar_color,
-        #                 border_radius=ft.border_radius.all(4),
-        #                 height=None,
-        #                 expand=int(round(sim_pct)),     # proportional fill
-        #             ),
-        #         ],
-        #         spacing=0,
-        #         expand=True,
-        #     ),
-        #     expand=False,
-        # )
         sim_bar = ft.Container(
             width=10,
             border_radius=ft.border_radius.all(4),
@@ -234,22 +243,86 @@ class ChatScreen:
             border=ft.border.all(1, "#3b3e4a"),
             border_radius=10,
             padding=ft.padding.all(12),
-            expand=True,
+            width=240,
+            height=200,
             on_click=lambda e, t=title, y=year, p=plot: self.show_movie_details(e, t, y, p),
             ink=True,
         )
 
-    def update_results(self, results_df: pd.DataFrame):
+    def _on_prev_page(self, e):
+        if self._current_page > 0:
+            self._current_page -= 1
+            self._render_current_page()
+
+    def _on_next_page(self, e):
+        max_page = min(self._total_pages, (len(self._all_cards) + self._cards_per_page - 1) // self._cards_per_page) - 1
+        if self._current_page < max_page:
+            self._current_page += 1
+            self._render_current_page()
+
+    def _update_pagination_controls(self):
+        num_pages = min(self._total_pages, (len(self._all_cards) + self._cards_per_page - 1) // self._cards_per_page)
+        num_pages = max(num_pages, 1)
+
+        self._prev_btn.disabled = self._current_page == 0
+        self._next_btn.disabled = self._current_page >= num_pages - 1
+
+        self._page_dots.controls.clear()
+        for i in range(num_pages):
+            is_active = i == self._current_page
+            self._page_dots.controls.append(
+                ft.Container(
+                    width=10 if is_active else 8,
+                    height=10 if is_active else 8,
+                    border_radius=ft.border_radius.all(5),
+                    bgcolor="#a8ffb2" if is_active else "#3b3e4a",
+                    border=ft.border.all(1, "#a8ffb2" if is_active else "#5b6070"),
+                    on_click=lambda e, idx=i: self._go_to_page(idx),
+                )
+            )
+
+        self.pagination_bar.visible = num_pages > 1
+
+    def _go_to_page(self, idx: int):
+        self._current_page = idx
+        self._render_current_page()
+
+    def _render_current_page(self):
         self.results_grid.controls.clear()
 
-        for _, row in results_df.iterrows():
+        start = self._current_page * self._cards_per_page
+        page_cards = self._all_cards[start: start + self._cards_per_page]
+
+        # Pad to 6 so the grid is always full
+        while len(page_cards) < self._cards_per_page:
+            page_cards.append(ft.Container(width=240, height=200))
+
+        for i in range(0, self._cards_per_page, 3):
+            self.results_grid.controls.append(
+                ft.Row(
+                    controls=page_cards[i:i + 3],
+                    spacing=14,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                )
+            )
+
+        self._update_pagination_controls()
+        self.page.update()
+
+    def update_results(self, results_df: pd.DataFrame):
+        max_results = self._total_pages * self._cards_per_page  # 24
+
+        self._all_cards = []
+        for _, row in results_df.head(max_results).iterrows():
             title = str(row.get("Title", "Unknown"))
             year = str(row.get("Release Year", "Unknown"))
             plot = str(row.get("Plot", ""))
             sim = row.get("Similarity", 0)
             sim_val = float(sim.strip('%')) / 100 if isinstance(sim, str) else 0.0
+            self._all_cards.append(self._build_card(title, year, plot, sim_val))
 
-            self.results_grid.controls.append(self._build_card(title, year, plot, sim_val))
+        self._current_page = 0
+        self._render_current_page()
 
         self.submit_button.content = ft.Text("Submit query", text_align=ft.TextAlign.CENTER)
         self.submit_button.disabled = False

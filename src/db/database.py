@@ -20,7 +20,7 @@ class Database:
         print("Loading Re-ranker...")
         self.reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
-    def search_movies(self, user_query: str, num_results: int = 5):
+    def search_movies(self, user_query: str, num_results: int = 24):
         query_vector = self.model.encode(user_query)
 
         raw_results_df = (
