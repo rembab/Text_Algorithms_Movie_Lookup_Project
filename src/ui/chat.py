@@ -3,7 +3,7 @@ import flet as ft
 import pandas as pd
 import asyncio
 
-WINDOW_WIDTH = 800
+WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 900
 CARD_HEIGHT = 200
 GRID_COLUMNS = 3
@@ -165,9 +165,7 @@ class ChatScreen:
         self.dialog_title = ft.Text(
             font_family="Consolas", weight=ft.FontWeight.BOLD, color="#FFFFFF"
         )
-        self.dialog_meta = ft.Text(
-            font_family="Consolas", size=13, color="#FFFFFF"
-        )
+        self.dialog_meta = ft.Text(font_family="Consolas", size=13, color="#FFFFFF")
         self.dialog_plot = ft.Text(
             font_family="Consolas", size=14, color="#FFFFFF", selectable=True
         )
@@ -305,7 +303,9 @@ class ChatScreen:
             meta_parts.append(f"Genre: {genre}")
         if confidence:
             meta_parts.append(f"Match: {confidence}")
-        self.dialog_meta.value = "  ·  ".join(meta_parts) if meta_parts else f"Year: {year}"
+        self.dialog_meta.value = (
+            "  ·  ".join(meta_parts) if meta_parts else f"Year: {year}"
+        )
         self.dialog_plot.value = plot if plot else "No plot available."
 
         self.similar_loading.visible = True
@@ -474,7 +474,10 @@ class ChatScreen:
             )
             return
 
-        cards = [self._build_card(self._movie_dict_from_row(row)) for _, row in similar_df.iterrows()]
+        cards = [
+            self._build_card(self._movie_dict_from_row(row))
+            for _, row in similar_df.iterrows()
+        ]
         for i in range(0, len(cards), GRID_COLUMNS):
             self.similar_grid.controls.append(
                 ft.Row(
@@ -505,8 +508,7 @@ class ChatScreen:
     def _update_pagination_controls(self):
         num_pages = min(
             self._total_pages,
-            (len(self._result_rows) + self._cards_per_page - 1)
-            // self._cards_per_page,
+            (len(self._result_rows) + self._cards_per_page - 1) // self._cards_per_page,
         )
         num_pages = max(num_pages, 1)
 
