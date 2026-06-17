@@ -17,6 +17,9 @@ import config
 
 
 GENRE_SPLIT_RE = re.compile(r"[,|\[\]/]")
+# Non-genre tokens to drop (e.g. the "Back to top" scraper artifact present in
+# every IMDB genre value, and assorted null-like placeholders).
+GENRE_NOISE = {"unknown", "back to top", "nan", "none", ""}
 # Strip the Python-list noise found in some keyword columns: ['a', 'b'].
 TERM_CLEAN_RE = re.compile(r"[\[\]'\"]")
 # Title normalisation for cross-source de-duplication.
@@ -40,7 +43,7 @@ def combine_genres(genres: List[str]) -> str:
         for g in genres
         if pd.notna(g)
         for part in GENRE_SPLIT_RE.split(str(g))
-        if part.strip() and part.strip().lower() != "unknown"
+        if part.strip() and part.strip().lower() not in GENRE_NOISE
     }
 
     return ", ".join(sorted(cleaned)) if cleaned else "Unknown"
@@ -170,13 +173,22 @@ def _load_source(source: Dict[str, str]) -> pd.DataFrame:
 
     df = df[["Title", "Release Year", "Genre", "Plot", "Cast", "Director", "Keywords"]]
 
+    # Quality gate: drop rows whose plot is empty/too short BEFORE the newest-N
+    # cut, so the rows we keep are the newest ones that actually carry plot text
+    # worth embedding (avoids blank result cards and weak vectors).
+    before_quality = len(df)
+    plot_len = df["Plot"].fillna("").astype(str).str.strip().str.len()
+    df = df[plot_len >= config.MIN_PLOT_CHARS].reset_index(drop=True)
+    dropped = before_quality - len(df)
+    if dropped:
+        print(f"  Dropped {dropped} rows with empty/short plots from {path}")
+
     limit_newest = source.get("limit_newest")
     if limit_newest is not None:
         before = len(df)
         df = _take_newest_by_year(df, limit_newest)
         print(
-            f"  Test subset: kept {len(df)} newest rows (of {before}) "
-            f"from {path}"
+            f"  Kept {len(df)} newest rows (of {before}) from {path}"
         )
 
     return df
@@ -212,6 +224,7 @@ def build_vector_database(
 
     print(f"Loading transformer model: {transformer_model}...")
     model = SentenceTransformer(transformer_model)
+    print(f"  Embedding on device: {model.device}")
 
     all_dfs = [_load_source(source) for source in csv_configs]
 
@@ -340,24 +353,34 @@ def _wiki_source(limit_newest: Optional[int] = None) -> Dict:
 
 
 def _all_sources() -> List[Dict]:
+    """The three production sources, each capped to the newest N movies (by
+    release year) via the per-source limits in `config`. IMDB is small, so it
+    is loaded in full (`IMDB_ROW_LIMIT = None`)."""
+    imdb = {
+        "path": "./data/imdb_movie_keyword.csv",
+        "title_col": "movie_title",
+        "year_col": "year",
+        "genre_col": "genre",
+        "plot_col": "synopsis",
+        "cast_col": "cast",
+        "keyword_cols": ["Key-Bert", "Yake"],
+    }
+    movieverse = {
+        "path": "./data/MovieVerse.csv",
+        "title_col": "movie_name",
+        "year_col": "year",
+        "genre_col": "movie_genres",
+        "plot_col": "movie_summary",
+    }
+    if config.IMDB_ROW_LIMIT is not None:
+        imdb["limit_newest"] = config.IMDB_ROW_LIMIT
+    if config.MOVIEVERSE_ROW_LIMIT is not None:
+        movieverse["limit_newest"] = config.MOVIEVERSE_ROW_LIMIT
+
     return [
-        _wiki_source(),
-        {
-            "path": "./data/imdb_movie_keyword.csv",
-            "title_col": "movie_title",
-            "year_col": "year",
-            "genre_col": "genre",
-            "plot_col": "synopsis",
-            "cast_col": "cast",
-            "keyword_cols": ["Key-Bert", "Yake"],
-        },
-        {
-            "path": "./data/MovieVerse.csv",
-            "title_col": "movie_name",
-            "year_col": "year",
-            "genre_col": "movie_genres",
-            "plot_col": "movie_summary",
-        },
+        _wiki_source(limit_newest=config.WIKI_ROW_LIMIT),
+        imdb,
+        movieverse,
     ]
 
 

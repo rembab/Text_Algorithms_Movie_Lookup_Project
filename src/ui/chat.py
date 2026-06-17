@@ -4,7 +4,7 @@ import pandas as pd
 import asyncio
 
 WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 800
+WINDOW_HEIGHT = 900
 CARD_HEIGHT = 200
 GRID_COLUMNS = 3
 CARDS_PER_PAGE = 6
@@ -147,7 +147,13 @@ class ChatScreen:
                 self.submit_button,
                 self.status_row,
                 ft.Divider(height=20, color="transparent"),
-                ft.Column([self.results_grid], scroll=ft.ScrollMode.AUTO, expand=True),
+                # Fixed height sized to fit two full rows of cards so the whole
+                # grid sits in view (no internal scroll / "bobbing"). Two rows of
+                # CARD_HEIGHT plus the inter-row spacing, with a little breathing room.
+                ft.Container(
+                    content=self.results_grid,
+                    height=2 * CARD_HEIGHT + 40,
+                ),
                 ft.Divider(height=10, color="transparent"),
                 self.pagination_bar,
             ],

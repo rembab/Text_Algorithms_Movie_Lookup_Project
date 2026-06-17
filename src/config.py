@@ -14,6 +14,19 @@ WIKI_CSV_PATH = "./data/wiki_movie_plots_deduped.csv"
 # --- Database build (testing) ---
 TEST_WIKI_ROW_LIMIT = 10_000  # used with `setup_database.py --test`
 
+# --- Database build (full) ---
+# Per-source caps applied to the *newest* movies (by release year) of each
+# source. Set a value to None to load the entire source. IMDB is small
+# (~9.7k rows) so it is loaded in full.
+WIKI_ROW_LIMIT = 15_000
+IMDB_ROW_LIMIT = None
+MOVIEVERSE_ROW_LIMIT = 20_000
+
+# Rows whose plot/synopsis is shorter than this are dropped before the newest-N
+# cut, so the rows that survive are the newest *with real plot text* (better
+# embeddings, no empty cards in the UI).
+MIN_PLOT_CHARS = 30
+
 # --- Models ---
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -24,7 +37,7 @@ NUM_RESULTS = 5           # final results shown to the user
 RESULTS_GRID_MAX = 24     # results requested to fill the paginated card grid (UI)
 SIMILAR_MOVIES_COUNT = 6  # neighbors shown in the detail panel
 SIMILARITY_THRESHOLD = 0.85  # plots more similar than this are treated as duplicates
-ENCODE_BATCH_SIZE = 64
+ENCODE_BATCH_SIZE = 128  # larger batch keeps the GPU fed; falls back fine on CPU
 ENABLE_FULLTEXT = True    # combine BM25 full-text hits with vector hits (hybrid retrieval)
 
 # BGE v1.5 is an instruction model: short queries should be prefixed for
