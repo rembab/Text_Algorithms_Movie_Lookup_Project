@@ -69,5 +69,5 @@ if __name__ == "__main__":
     print("Starting Movie Lookup (web view)...")
     print("Your browser should open automatically. Keep this terminal open.")
     # port=0 picks a free port so a leftover instance can't block startup.
-    # ft.run(main=main, view=ft.AppView.WEB_BROWSER, port=0)
-    ft.run(main=main, view=ft.AppView.FLET_APP, port=0)
+    ft.run(main=main, view=ft.AppView.WEB_BROWSER, port=0)
+    # ft.run(main=main, view=ft.AppView.FLET_APP, port=0)
